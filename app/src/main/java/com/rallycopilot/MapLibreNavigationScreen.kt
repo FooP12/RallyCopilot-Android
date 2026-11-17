@@ -45,6 +45,8 @@ import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
 import java.net.URL
+import com.rallycopilot.game.RallyGameRepository
+import com.rallycopilot.game.RallyGameState
 
 private val RallyLime = Color(0xFFB7F34A)
 private val RallyPanel = Color(0xF21B2329)
@@ -63,6 +65,8 @@ fun MapLibreNavigationScreen(
     currentLocation: Location?,
     onEnableGps: () -> Unit,
     onSpeak: (String) -> Unit,
+    gameRepository: RallyGameRepository,
+    gameState: RallyGameState,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -221,6 +225,8 @@ fun MapLibreNavigationScreen(
                     }
                 }
             })
+            RallyTripPanel(gameState, gameRepository, Modifier.fillMaxWidth())
+            RallyWeatherCard(currentLocation, Modifier.fillMaxWidth())
             Surface(color = RallyPanel, shape = RoundedCornerShape(12.dp)) {
                 Text("RALLY COPILOT · MAPLIBRE", color = RallyLime, modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp), fontSize = 11.sp)
             }
