@@ -59,7 +59,7 @@ fun RallyWeatherCard(location: Location?, modifier: Modifier = Modifier) {
 
     Surface(modifier.fillMaxWidth().clickable { expanded = !expanded }, color = Color(0xE51B2329), shape = RoundedCornerShape(12.dp)) {
         Column(Modifier.padding(horizontal = 11.dp, vertical = 8.dp)) {
-            Text("ПОГОДА РЯДОМ", color = Color(0xFFB7F34A), fontSize = 9.sp)
+            Text("ПОГОДА", color = Color(0xFFB7F34A), fontSize = 8.sp)
             when {
                 location == null -> Text("Включи GPS, чтобы узнать погоду по местоположению", color = Color.White, fontSize = 11.sp)
                 loading -> Row {
@@ -69,8 +69,8 @@ fun RallyWeatherCard(location: Location?, modifier: Modifier = Modifier) {
                 }
                 weather != null -> {
                     val value = weather!!
-                    Text("${value.temperature}°C · ${value.description}", color = Color.White, fontSize = 13.sp)
-                    Text("Ощущается ${value.feelsLike}° · ветер ${value.wind} км/ч · осадки ${"%.1f".format(value.precipitation)} мм", color = Color.LightGray, fontSize = 10.sp)
+                    Text("${value.temperature}°C · ${value.description}", color = Color.White, fontSize = 11.sp)
+                    Text("Осадки ${"%.1f".format(value.precipitation)} мм", color = Color.LightGray, fontSize = 9.sp)
                     if (value.warning != null) {
                         Spacer(Modifier.height(3.dp))
                         Text(value.warning, color = Color(0xFFFFA36C), fontSize = 10.sp)
@@ -80,7 +80,7 @@ fun RallyWeatherCard(location: Location?, modifier: Modifier = Modifier) {
                         Text("ПРОГНОЗ НА 3 ДНЯ", color = Color(0xFFB7F34A), fontSize = 9.sp)
                         value.forecast.forEach { Text(it, color = Color.White, fontSize = 10.sp) }
                     } else {
-                        Text("Нажми, чтобы открыть прогноз на 3 дня", color = Color.LightGray, fontSize = 9.sp)
+                        Text("Прогноз на 3 дня", color = Color.LightGray, fontSize = 8.sp)
                     }
                 }
                 failed -> Text("Погода временно недоступна. Проверь интернет.", color = Color(0xFFFFA08A), fontSize = 10.sp)
