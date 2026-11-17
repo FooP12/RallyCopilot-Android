@@ -12,6 +12,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.core.app.ActivityCompat
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -150,7 +151,10 @@ fun RallyCopilotApp(
         androidx.compose.material3.Scaffold(
             containerColor = night,
             bottomBar = {
-                androidx.compose.material3.NavigationBar(containerColor = panel, contentColor = androidx.compose.ui.graphics.Color.White) {
+                androidx.compose.foundation.layout.Row(
+                    modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceEvenly
+                ) {
                     val items = listOf("Заезд", "Гараж", "Рейтинг", "Профиль")
                     val icons = listOf(
                         androidx.compose.material.icons.Icons.Default.Map,
@@ -159,12 +163,24 @@ fun RallyCopilotApp(
                         androidx.compose.material.icons.Icons.Default.Person
                     )
                     items.forEachIndexed { index, label ->
-                        androidx.compose.material3.NavigationBarItem(
-                            selected = selectedTab == index,
-                            onClick = { selectedTab = index },
-                            icon = { androidx.compose.material3.Icon(icons[index], contentDescription = label) },
-                            label = { androidx.compose.material3.Text(label) }
-                        )
+                        androidx.compose.foundation.layout.Column(
+                            modifier = androidx.compose.ui.Modifier
+                                .weight(1f)
+                                .clickable { selectedTab = index }
+                                .padding(vertical = 10.dp),
+                            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
+                        ) {
+                            androidx.compose.material3.Icon(
+                                icons[index],
+                                contentDescription = label,
+                                tint = if (selectedTab == index) lime else androidx.compose.ui.graphics.Color.White
+                            )
+                            androidx.compose.material3.Text(
+                                label,
+                                color = if (selectedTab == index) lime else androidx.compose.ui.graphics.Color.White,
+                                fontSize = 11.sp
+                            )
+                        }
                     }
                 }
             }
@@ -202,14 +218,25 @@ private fun ProfileScreen(
                 androidx.compose.foundation.layout.Spacer(Modifier.height(8.dp))
                 androidx.compose.material3.Text(selected?.let { "${it.name} · ${it.locale.displayName}" } ?: "Загрузка голосов…", color = androidx.compose.ui.graphics.Color.White, fontSize = 14.sp)
                 androidx.compose.foundation.layout.Spacer(Modifier.height(10.dp))
-                androidx.compose.material3.ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+                androidx.compose.foundation.layout.Box {
                     androidx.compose.material3.OutlinedTextField(
                         value = selected?.name ?: if (voiceReady) "Нет доступных голосов" else "Загрузка…",
-                        onValueChange = {}, readOnly = true, label = { androidx.compose.material3.Text("Выбрать голос") },
-                        trailingIcon = { androidx.compose.material3.ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-                        modifier = Modifier.menuAnchor().fillMaxWidth(), enabled = voices.isNotEmpty()
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { androidx.compose.material3.Text("Выбрать голос") },
+                        trailingIcon = {
+                            androidx.compose.material3.Icon(
+                                androidx.compose.material.icons.Icons.Default.Map,
+                                contentDescription = "Открыть список голосов"
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth().clickable { expanded = true },
+                        enabled = voices.isNotEmpty()
                     )
-                    androidx.compose.material3.ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                    androidx.compose.material3.DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
                         voices.forEach { voice ->
                             androidx.compose.material3.DropdownMenuItem(
                                 text = { androidx.compose.material3.Text("${voice.name} (${voice.locale.displayName})") },
