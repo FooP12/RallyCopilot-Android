@@ -228,7 +228,7 @@ fun MapLibreNavigationScreen(
                 }
             })
         }
-        RallyWeatherCard(currentLocation, Modifier.align(Alignment.TopEnd).padding(top = 94.dp, end = 10.dp).widthIn(max = 150.dp))
+        RallyWeatherCard(currentLocation, Modifier.align(Alignment.TopEnd).padding(top = 148.dp, end = 10.dp).widthIn(max = 150.dp))
         if (routeBusy || routeDistance.isNotBlank() || nextInstruction.isNotBlank()) {
             Surface(Modifier.align(Alignment.BottomCenter).fillMaxWidth(0.82f).padding(bottom = 116.dp), color = RallyPanel, shape = RoundedCornerShape(12.dp)) {
                 Column(Modifier.padding(horizontal = 12.dp, vertical = 9.dp)) {
