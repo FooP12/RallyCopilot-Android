@@ -272,6 +272,15 @@ private fun ProfileScreen(
         androidx.compose.foundation.layout.Spacer(Modifier.height(14.dp))
         androidx.compose.material3.Surface(color = panel, shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp)) {
             androidx.compose.foundation.layout.Column(Modifier.padding(16.dp)) {
+                androidx.compose.material3.Text("ВЕРСИЯ ПРИЛОЖЕНИЯ", color = muted, fontSize = 11.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                androidx.compose.foundation.layout.Spacer(Modifier.height(6.dp))
+                androidx.compose.material3.Text("Rally Copilot 0.6.2", color = androidx.compose.ui.graphics.Color.White, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                androidx.compose.material3.Text("Тестовая сборка · MapLibre / OpenStreetMap", color = muted, fontSize = 11.sp)
+            }
+        }
+        androidx.compose.foundation.layout.Spacer(Modifier.height(14.dp))
+        androidx.compose.material3.Surface(color = panel, shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp)) {
+            androidx.compose.foundation.layout.Column(Modifier.padding(16.dp)) {
                 androidx.compose.material3.Text("КАРТА И РЕЖИМ", color = muted, fontSize = 11.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
                 androidx.compose.foundation.layout.Spacer(Modifier.height(8.dp))
                 androidx.compose.material3.Text("MapLibre · тёмная спортивная карта", color = androidx.compose.ui.graphics.Color.White, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
