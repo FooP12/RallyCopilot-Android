@@ -6,6 +6,8 @@ import android.location.Location
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -188,7 +190,7 @@ fun MapLibreNavigationScreen(
 
     Box(modifier.fillMaxSize().background(Color(0xFF101418))) {
         AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
-        Column(Modifier.align(Alignment.TopStart).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.align(Alignment.TopStart).fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             PlaceSearchPanel(currentLocation = currentLocation, onPlaceSelected = { selected ->
                 destination = selected
                 routeDistance = ""
@@ -225,46 +227,39 @@ fun MapLibreNavigationScreen(
                     }
                 }
             })
-            RallyTripPanel(gameState, gameRepository, Modifier.fillMaxWidth())
-            RallyWeatherCard(currentLocation, Modifier.fillMaxWidth())
-            Surface(color = RallyPanel, shape = RoundedCornerShape(12.dp)) {
-                Text("RALLY COPILOT · MAPLIBRE", color = RallyLime, modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp), fontSize = 11.sp)
-            }
-            Surface(color = RallyPanel, shape = RoundedCornerShape(12.dp)) {
-                Column(Modifier.padding(12.dp)) {
-                    Text(routeStatus, color = Color.White, fontSize = 12.sp)
-                    if (routeBusy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 8.dp), color = RallyLime)
-                    if (routeDistance.isNotBlank()) {
-                        Spacer(Modifier.height(6.dp))
-                        Text("$routeDistance · $routeEta", color = RallyLime, fontSize = 13.sp)
-                    }
-                    if (nextInstruction.isNotBlank()) {
-                        Spacer(Modifier.height(5.dp))
-                        Text("ПЕРВАЯ ПОДСКАЗКА", color = RallyLime, fontSize = 10.sp)
-                        Text(nextInstruction, color = Color.White, fontSize = 12.sp)
+        }
+        RallyWeatherCard(currentLocation, Modifier.align(Alignment.TopEnd).padding(top = 94.dp, end = 10.dp).widthIn(max = 150.dp))
+        if (routeBusy || routeDistance.isNotBlank() || nextInstruction.isNotBlank()) {
+            Surface(Modifier.align(Alignment.BottomCenter).fillMaxWidth(0.82f).padding(bottom = 116.dp), color = RallyPanel, shape = RoundedCornerShape(12.dp)) {
+                Column(Modifier.padding(horizontal = 12.dp, vertical = 9.dp)) {
+                    if (routeBusy) {
+                        LinearProgressIndicator(Modifier.fillMaxWidth(), color = RallyLime)
+                        Text("Строю маршрут…", color = Color.White, fontSize = 11.sp)
+                    } else {
+                        if (routeDistance.isNotBlank()) Text("$routeDistance · $routeEta", color = RallyLime, fontSize = 12.sp)
+                        if (nextInstruction.isNotBlank()) Text(nextInstruction, color = Color.White, fontSize = 12.sp)
                     }
                 }
             }
         }
-        Surface(
-            Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 8.dp, vertical = 7.dp),
-            color = RallyPanel, shape = RoundedCornerShape(8.dp)
-        ) {
-            Text("© OpenStreetMap contributors · © CARTO", color = Color.LightGray, fontSize = 9.sp,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp))
+        Surface(Modifier.align(Alignment.BottomEnd).padding(end = 8.dp, bottom = 104.dp), color = RallyPanel.copy(alpha = 0.78f), shape = RoundedCornerShape(5.dp)) {
+            Text("© OpenStreetMap · CARTO", color = Color.LightGray, fontSize = 8.sp, modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp))
         }
-        Row(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(start = 10.dp, end = 10.dp, bottom = 32.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-            Button(onClick = {
+        Row(Modifier.align(Alignment.BottomStart).padding(start = 12.dp, bottom = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(onClick = {
                 val fine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
                 val coarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
                 if (fine || coarse) onEnableGps() else permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
-            }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = RallyPanel, contentColor = RallyLime)) { Text("МОЁ МЕСТО", fontSize = 10.sp) }
+            }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)) { Text("МОЁ МЕСТО", fontSize = 10.sp) }
             OutlinedButton(onClick = {
                 destination = null; routeDistance = ""; routeEta = ""; nextInstruction = ""
                 routeStatus = "Нажми и удерживай точку на карте, чтобы выбрать финиш"
                 map?.style?.getSourceAs<GeoJsonSource>("rally-destination-source")?.setGeoJson(FeatureCollection.fromFeatures(emptyArray<Feature>()))
                 map?.style?.getSourceAs<GeoJsonSource>("rally-route-source")?.setGeoJson(FeatureCollection.fromFeatures(emptyArray<Feature>()))
-            }, modifier = Modifier.weight(1f), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)) { Text("СБРОС", fontSize = 10.sp) }
+            }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)) { Text("СБРОС", fontSize = 10.sp) }
+        }
+        Surface(Modifier.align(Alignment.BottomEnd).padding(end = 14.dp, bottom = 14.dp).size(66.dp).clickable { if (gameState.tripActive) gameRepository.finishTrip() else gameRepository.startTrip() }, color = RallyLime, shape = CircleShape, shadowElevation = 8.dp) {
+            Box(contentAlignment = Alignment.Center) { Text(if (gameState.tripActive) "СТОП" else "СТАРТ", color = Color(0xFF101418), fontSize = 11.sp) }
         }
     }
 }
