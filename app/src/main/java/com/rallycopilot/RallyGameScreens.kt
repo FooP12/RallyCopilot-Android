@@ -61,6 +61,7 @@ fun RallyShopScreen(state: RallyGameState, repository: RallyGameRepository, modi
         LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(bottom = 20.dp)) {
             items(shopItems) { item ->
                 val owned = item.id in state.purchasedItems
+                val equipped = item.id in state.equippedItems
                 Surface(color = GamePanel, shape = RoundedCornerShape(14.dp)) {
                     Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(item.icon, color = GameLime, fontSize = 26.sp, modifier = Modifier.width(42.dp))
@@ -70,10 +71,10 @@ fun RallyShopScreen(state: RallyGameState, repository: RallyGameRepository, modi
                             Text("${item.price} RC", color = GameLime, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                         Button(
-                            onClick = { repository.purchase(item.id, item.price) },
-                            enabled = !owned && state.coins >= item.price,
+                            onClick = { if (owned) repository.equip(item.id) else repository.purchase(item.id, item.price) },
+                            enabled = !equipped && (owned || state.coins >= item.price),
                             colors = ButtonDefaults.buttonColors(containerColor = GameLime, contentColor = Color(0xFF101418), disabledContainerColor = Color(0xFF39434A))
-                        ) { Text(if (owned) "КУПЛЕНО" else "КУПИТЬ", fontSize = 9.sp) }
+                        ) { Text(if (equipped) "НАДЕТО" else if (owned) "НАДЕТЬ" else "КУПИТЬ", fontSize = 9.sp) }
                     }
                 }
             }
@@ -144,7 +145,7 @@ fun RallyProfileStats(state: RallyGameState, modifier: Modifier = Modifier) {
                 StatValue("Поездки", state.completedTrips.toString())
             }
             Spacer(Modifier.height(10.dp))
-            Text("Достижения: ${state.unlockedAchievements.size} · Предметы: ${state.purchasedItems.size}", color = GameLime, fontSize = 11.sp)
+            Text("Достижения: ${state.unlockedAchievements.size} · Предметы: ${state.purchasedItems.size} · Надето: ${state.equippedItems.size}", color = GameLime, fontSize = 11.sp)
         }
     }
 }
