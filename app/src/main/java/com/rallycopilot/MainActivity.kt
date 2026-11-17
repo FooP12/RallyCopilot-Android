@@ -17,6 +17,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Garage
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.ShoppingCart
@@ -167,8 +168,8 @@ fun RallyCopilotApp(
             containerColor = night,
             bottomBar = {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    val labels = listOf("Заезд", "Магазин", "Достижения", "Профиль")
-                    val icons = listOf(Icons.Default.Map, Icons.Default.ShoppingCart, Icons.Default.EmojiEvents, Icons.Default.Person)
+                    val labels = listOf("Заезд", "Гараж", "Магазин", "Достижения", "Профиль")
+                    val icons = listOf(Icons.Default.Map, Icons.Default.Garage, Icons.Default.ShoppingCart, Icons.Default.EmojiEvents, Icons.Default.Person)
                     labels.forEachIndexed { index, label ->
                         Column(
                             Modifier.weight(1f).clickable { selectedTab = index }.padding(vertical = 10.dp),
@@ -183,8 +184,9 @@ fun RallyCopilotApp(
         ) { padding ->
             when (selectedTab) {
                 0 -> MapLibreNavigationScreen(currentLocation, onEnableGps, onSpeak, gameRepository, gameState, Modifier.padding(padding))
-                1 -> RallyShopScreen(gameState, gameRepository, Modifier.padding(padding))
-                2 -> RallyAchievementsScreen(gameState, Modifier.padding(padding))
+                1 -> RallyGarageScreen(Modifier.padding(padding))
+                2 -> RallyShopScreen(gameState, gameRepository, Modifier.padding(padding))
+                3 -> RallyAchievementsScreen(gameState, Modifier.padding(padding))
                 else -> ProfileScreen(
                     voices, selectedVoiceName, voiceReady, onVoiceSelected, onTestVoice,
                     gameState, Modifier.padding(padding)
