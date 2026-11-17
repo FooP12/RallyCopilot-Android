@@ -49,6 +49,8 @@ import org.maplibre.geojson.Point
 import java.net.URL
 import com.rallycopilot.game.RallyGameRepository
 import com.rallycopilot.game.RallyGameState
+import com.rallycopilot.core.GuidanceStep
+import com.rallycopilot.core.RallyGuidanceEngine
 
 private val RallyLime = Color(0xFFB7F34A)
 private val RallyPanel = Color(0xF21B2329)
@@ -59,7 +61,8 @@ private data class RouteResult(
     val coordinates: List<LatLng>,
     val distanceMeters: Double,
     val durationSeconds: Double,
-    val firstInstruction: String
+    val firstInstruction: String,
+    val steps: List<GuidanceStep>
 )
 
 @Composable
@@ -82,6 +85,13 @@ fun MapLibreNavigationScreen(
     var routeDistance by remember { mutableStateOf("") }
     var routeEta by remember { mutableStateOf("") }
     var nextInstruction by remember { mutableStateOf("") }
+    var routeSteps by remember { mutableStateOf<List<GuidanceStep>>(emptyList()) }
+    var routeCoordinates by remember { mutableStateOf<List<LatLng>>(emptyList()) }
+    var routeProgressMeters by remember { mutableDoubleStateOf(0.0) }
+    var offRouteFixes by remember { mutableIntStateOf(0) }
+    var rerouting by remember { mutableStateOf(false) }
+    var lastRerouteAt by remember { mutableLongStateOf(0L) }
+    val guidanceEngine = remember { RallyGuidanceEngine() }
     var routeBusy by remember { mutableStateOf(false) }
     var centeredOnGps by remember { mutableStateOf(false) }
     var lastRouteRequestAt by remember { mutableLongStateOf(0L) }
@@ -127,6 +137,11 @@ fun MapLibreNavigationScreen(
                     routeDistance = ""
                     routeEta = ""
                     nextInstruction = ""
+                    routeSteps = emptyList()
+                    routeCoordinates = emptyList()
+                    routeProgressMeters = 0.0
+                    offRouteFixes = 0
+                    guidanceEngine.reset()
                     mapInstance.style?.getSourceAs<GeoJsonSource>("rally-destination-source")?.setGeoJson(
                         Feature.fromGeometry(Point.fromLngLat(selected.longitude, selected.latitude))
                     )
@@ -145,11 +160,16 @@ fun MapLibreNavigationScreen(
                                 val result = fetchOsrmRoute(origin.latitude, origin.longitude, selected.latitude, selected.longitude)
                                 routeDistance = formatDistance(result.distanceMeters)
                                 routeEta = formatDuration(result.durationSeconds)
-                                nextInstruction = result.firstInstruction
+                                routeSteps = result.steps
+                                routeCoordinates = result.coordinates
+                                routeProgressMeters = 0.0
+                                offRouteFixes = 0
+                                guidanceEngine.reset()
+                                nextInstruction = guidanceEngine.preview(0.0, routeSteps)
                                 val line = LineString.fromLngLats(result.coordinates.map { Point.fromLngLat(it.longitude, it.latitude) })
                                 mapInstance.style?.getSourceAs<GeoJsonSource>("rally-route-source")?.setGeoJson(Feature.fromGeometry(line))
                                 routeStatus = "Маршрут построен. Это предварительный расчёт, не автопилот."
-                                if (result.firstInstruction.isNotBlank()) onSpeak("Маршрут построен. ${result.firstInstruction}")
+                                onSpeak(routeIntroduction(result))
                                 val bounds = org.maplibre.android.geometry.LatLngBounds.Builder()
                                     .include(LatLng(origin.latitude, origin.longitude)).include(selected).build()
                                 mapInstance.easeCamera(CameraUpdateFactory.newLatLngBounds(bounds, 80), 700)
@@ -184,6 +204,52 @@ fun MapLibreNavigationScreen(
         }
     }
 
+    LaunchedEffect(currentLocation, routeCoordinates, routeSteps, destination) {
+        val location = currentLocation ?: return@LaunchedEffect
+        if (routeCoordinates.size < 2 || routeSteps.isEmpty() || location.accuracy > 50f) return@LaunchedEffect
+
+        val snap = nearestRouteProgress(location, routeCoordinates)
+        offRouteFixes = if (snap.distanceFromRouteMeters > 65.0) offRouteFixes + 1 else 0
+
+        val maxAdvance = maxOf(100.0, location.speed.toDouble() * 2.0 + 35.0)
+        val progress = maxOf(routeProgressMeters, minOf(snap.progressMeters, routeProgressMeters + maxAdvance))
+        routeProgressMeters = progress
+
+        guidanceEngine.update(progress, routeSteps)?.let { onSpeak(it) }
+        nextInstruction = guidanceEngine.preview(progress, routeSteps)
+
+        val now = System.currentTimeMillis()
+        val target = destination
+        if (offRouteFixes >= 3 && target != null && !rerouting && now - lastRerouteAt >= 12000L) {
+            rerouting = true
+            offRouteFixes = 0
+            lastRerouteAt = now
+            scope.launch {
+                try {
+                    val updated = fetchOsrmRoute(location.latitude, location.longitude, target.latitude, target.longitude)
+                    if (destination == target) {
+                        routeDistance = formatDistance(updated.distanceMeters)
+                        routeEta = formatDuration(updated.durationSeconds)
+                        routeSteps = updated.steps
+                        routeCoordinates = updated.coordinates
+                        routeProgressMeters = 0.0
+                        guidanceEngine.reset()
+                        nextInstruction = guidanceEngine.preview(0.0, routeSteps)
+                        val line = LineString.fromLngLats(updated.coordinates.map { Point.fromLngLat(it.longitude, it.latitude) })
+                        map?.style?.getSourceAs<GeoJsonSource>("rally-route-source")?.setGeoJson(Feature.fromGeometry(line))
+                        routeStatus = "Маршрут перестроен"
+                        onSpeak("Ты отклонился от маршрута. Маршрут перестроен. " + nextInstruction)
+                    }
+                } catch (_: Exception) {
+                    routeStatus = "Не удалось перестроить маршрут. Продолжай к ближайшей дороге."
+                    onSpeak("Ты отклонился от маршрута. Не удалось перестроить путь. Будь внимателен.")
+                } finally {
+                    rerouting = false
+                }
+            }
+        }
+    }
+
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
         if (result[Manifest.permission.ACCESS_FINE_LOCATION] == true || result[Manifest.permission.ACCESS_COARSE_LOCATION] == true) onEnableGps()
     }
@@ -196,6 +262,11 @@ fun MapLibreNavigationScreen(
                 routeDistance = ""
                 routeEta = ""
                 nextInstruction = ""
+                routeSteps = emptyList()
+                routeCoordinates = emptyList()
+                routeProgressMeters = 0.0
+                offRouteFixes = 0
+                guidanceEngine.reset()
                 map?.style?.getSourceAs<GeoJsonSource>("rally-destination-source")?.setGeoJson(
                     Feature.fromGeometry(Point.fromLngLat(selected.longitude, selected.latitude))
                 )
@@ -211,11 +282,16 @@ fun MapLibreNavigationScreen(
                             val result = fetchOsrmRoute(origin.latitude, origin.longitude, selected.latitude, selected.longitude)
                             routeDistance = formatDistance(result.distanceMeters)
                             routeEta = formatDuration(result.durationSeconds)
-                            nextInstruction = result.firstInstruction
+                            routeSteps = result.steps
+                            routeCoordinates = result.coordinates
+                            routeProgressMeters = 0.0
+                            offRouteFixes = 0
+                            guidanceEngine.reset()
+                            nextInstruction = guidanceEngine.preview(0.0, routeSteps)
                             val line = LineString.fromLngLats(result.coordinates.map { Point.fromLngLat(it.longitude, it.latitude) })
                             map?.style?.getSourceAs<GeoJsonSource>("rally-route-source")?.setGeoJson(Feature.fromGeometry(line))
                             routeStatus = "Маршрут построен. Это предварительный расчёт, не автопилот."
-                            if (result.firstInstruction.isNotBlank()) onSpeak("Маршрут построен. ${result.firstInstruction}")
+                            onSpeak(routeIntroduction(result))
                             val bounds = org.maplibre.android.geometry.LatLngBounds.Builder()
                                 .include(LatLng(origin.latitude, origin.longitude)).include(selected).build()
                             map?.easeCamera(CameraUpdateFactory.newLatLngBounds(bounds, 80), 700)
@@ -238,6 +314,11 @@ fun MapLibreNavigationScreen(
                     } else {
                         if (routeDistance.isNotBlank()) Text("$routeDistance · $routeEta", color = RallyLime, fontSize = 12.sp)
                         if (nextInstruction.isNotBlank()) Text(nextInstruction, color = Color.White, fontSize = 12.sp)
+                        if (nextInstruction.isNotBlank()) {
+                            TextButton(onClick = { onSpeak("Повторяю. " + nextInstruction) }, contentPadding = PaddingValues(0.dp)) {
+                                Text("ПОВТОРИТЬ КОМАНДУ", color = RallyLime, fontSize = 10.sp)
+                            }
+                        }
                     }
                 }
             }
@@ -253,6 +334,8 @@ fun MapLibreNavigationScreen(
             }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)) { Text("МОЁ МЕСТО", fontSize = 10.sp) }
             OutlinedButton(onClick = {
                 destination = null; routeDistance = ""; routeEta = ""; nextInstruction = ""
+                routeSteps = emptyList(); routeCoordinates = emptyList(); routeProgressMeters = 0.0
+                offRouteFixes = 0; guidanceEngine.reset()
                 routeStatus = "Нажми и удерживай точку на карте, чтобы выбрать финиш"
                 map?.style?.getSourceAs<GeoJsonSource>("rally-destination-source")?.setGeoJson(FeatureCollection.fromFeatures(emptyArray<Feature>()))
                 map?.style?.getSourceAs<GeoJsonSource>("rally-route-source")?.setGeoJson(FeatureCollection.fromFeatures(emptyArray<Feature>()))
@@ -282,38 +365,93 @@ private suspend fun fetchOsrmRoute(startLat: Double, startLon: Double, endLat: D
             val pair = coordinatesJson.getJSONArray(i)
             LatLng(pair.getDouble(1), pair.getDouble(0))
         }
-        val steps = route.getJSONArray("legs").getJSONObject(0).getJSONArray("steps")
-        val maneuverStep = (0 until steps.length())
-            .map { steps.getJSONObject(it) }
-            .firstOrNull { it.getJSONObject("maneuver").optString("type") !in setOf("depart", "arrive") }
-            ?: if (steps.length() > 0) steps.getJSONObject(0) else null
-        val firstInstruction = maneuverStep?.let { step ->
+        val stepsJson = route.getJSONArray("legs").getJSONObject(0).getJSONArray("steps")
+        val guidanceSteps = mutableListOf<GuidanceStep>()
+        var distanceFromStart = 0.0
+        for (index in 0 until stepsJson.length()) {
+            val step = stepsJson.getJSONObject(index)
             val maneuver = step.getJSONObject("maneuver")
-            val street = step.optString("name").takeIf { it.isNotBlank() }
-            val instruction = rallyInstruction(maneuver.optString("type"), maneuver.optString("modifier"), street)
-            val metersToManeuver = step.optDouble("distance", 0.0)
-            if (metersToManeuver > 0) "Через ${formatDistance(metersToManeuver)} $instruction" else instruction
-        } ?: "Следуй по маршруту"
-        RouteResult(coordinates, route.getDouble("distance"), route.getDouble("duration"), firstInstruction)
+            val type = maneuver.optString("type")
+            if (type != "depart") {
+                val street = step.optString("name").takeIf { it.isNotBlank() }
+                val instruction = rallyInstruction(type, maneuver.optString("modifier"), street, maneuver.optInt("exit", 0))
+                guidanceSteps += GuidanceStep(
+                    distanceFromStartMeters = distanceFromStart,
+                    instruction = instruction,
+                    isArrival = type == "arrive"
+                )
+            }
+            distanceFromStart += step.optDouble("distance", 0.0)
+        }
+        val firstInstruction = guidanceSteps.firstOrNull()?.instruction ?: "Следуй по маршруту"
+        RouteResult(coordinates, route.getDouble("distance"), route.getDouble("duration"), firstInstruction, guidanceSteps)
     } finally { connection.disconnect() }
 }
 
-private fun rallyInstruction(type: String, modifier: String, street: String?): String {
+private fun rallyInstruction(type: String, modifier: String, street: String?, exitNumber: Int): String {
+    if (type == "arrive") return "Финиш. Остановись в пункте назначения"
+    if (type == "roundabout" || type == "rotary" || type == "roundabout turn") {
+        val exitText = if (exitNumber > 0) "съезд номер " + exitNumber else "нужный съезд"
+        return "На круговом движении выбери " + exitText + (street?.let { ", затем на " + it } ?: "")
+    }
     val direction = when {
+        modifier.contains("sharp left") -> "резко налево"
+        modifier.contains("slight left") -> "плавно налево"
         modifier.contains("left") -> "налево"
+        modifier.contains("sharp right") -> "резко направо"
+        modifier.contains("slight right") -> "плавно направо"
         modifier.contains("right") -> "направо"
         modifier == "uturn" -> "разворот"
-        modifier == "straight" -> "прямо"
+        modifier == "straight" || modifier.isBlank() -> "прямо"
         else -> "по маршруту"
     }
     val action = when (type) {
-        "depart" -> "Старт. Держи курс"
-        "arrive" -> "Финиш рядом"
-        "roundabout", "rotary", "roundabout turn" -> "На круговом движении съезд $direction"
-        "turn", "end of road", "fork", "continue", "new name", "merge", "on ramp", "off ramp" -> "Дальше $direction"
-        else -> "Дальше $direction"
+        "fork" -> "На развилке держись " + direction
+        "end of road" -> "В конце дороги поверни " + direction
+        "merge" -> "Влейся в поток, держись " + direction
+        "on ramp" -> "На съезде держись " + direction
+        "off ramp" -> "Съезжай " + direction
+        else -> "Поверни " + direction
     }
-    return if (street != null) "$action, на $street" else action
+    return if (street != null) action + " на " + street else action
+}
+
+private fun routeIntroduction(route: RouteResult): String {
+    val first = route.steps.firstOrNull()
+    val next = if (first == null) "Следуй по маршруту" else
+        "Первая команда через " + formatDistance(first.distanceFromStartMeters) + ": " + first.instruction
+    return "Маршрут построен. Расстояние " + formatDistance(route.distanceMeters) +
+        ". В пути примерно " + formatDuration(route.durationSeconds) + ". " + next
+}
+
+private data class RouteSnap(val distanceFromRouteMeters: Double, val progressMeters: Double)
+
+private fun nearestRouteProgress(location: Location, coordinates: List<LatLng>): RouteSnap {
+    var cumulative = 0.0
+    var bestDistance = Double.MAX_VALUE
+    var bestProgress = 0.0
+    for (index in coordinates.indices) {
+        val point = coordinates[index]
+        if (index > 0) cumulative += haversineMeters(coordinates[index - 1], point)
+        val result = FloatArray(1)
+        Location.distanceBetween(location.latitude, location.longitude, point.latitude, point.longitude, result)
+        if (result[0].toDouble() < bestDistance) {
+            bestDistance = result[0].toDouble()
+            bestProgress = cumulative
+        }
+    }
+    return RouteSnap(bestDistance, bestProgress)
+}
+
+private fun haversineMeters(a: LatLng, b: LatLng): Double {
+    val lat1 = Math.toRadians(a.latitude)
+    val lat2 = Math.toRadians(b.latitude)
+    val dLat = lat2 - lat1
+    val dLon = Math.toRadians(b.longitude - a.longitude)
+    val sinLat = kotlin.math.sin(dLat / 2.0)
+    val sinLon = kotlin.math.sin(dLon / 2.0)
+    val h = sinLat * sinLat + kotlin.math.cos(lat1) * kotlin.math.cos(lat2) * sinLon * sinLon
+    return 6371000.0 * 2.0 * kotlin.math.asin(kotlin.math.sqrt(h))
 }
 
 private fun formatDistance(meters: Double): String = if (meters >= 1000) "%.1f км".format(meters / 1000.0) else "${meters.toInt()} м"

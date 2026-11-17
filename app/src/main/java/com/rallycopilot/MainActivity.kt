@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
+import android.media.AudioAttributes
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.speech.tts.Voice
@@ -39,6 +40,9 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private var ttsReady by mutableStateOf(false)
     private var availableVoices by mutableStateOf<List<Voice>>(emptyList())
     private var selectedVoiceName by mutableStateOf("")
+    private var voiceEnabled by mutableStateOf(true)
+    private var speechRate by mutableFloatStateOf(1.0f)
+    private var speechPitch by mutableFloatStateOf(1.0f)
     private var currentLocation by mutableStateOf<Location?>(null)
     private lateinit var gameRepository: RallyGameRepository
     private val locationManager by lazy { getSystemService(LOCATION_SERVICE) as LocationManager }
@@ -53,6 +57,9 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         val prefs = getSharedPreferences("rally_copilot", MODE_PRIVATE)
         gameRepository = RallyGameRepository(getSharedPreferences("rally_game", MODE_PRIVATE))
         selectedVoiceName = prefs.getString("voice_name", "") ?: ""
+        voiceEnabled = prefs.getBoolean("voice_enabled", true)
+        speechRate = prefs.getFloat("speech_rate", 1.0f).coerceIn(0.75f, 1.25f)
+        speechPitch = prefs.getFloat("speech_pitch", 1.0f).coerceIn(0.8f, 1.2f)
         tts = TextToSpeech(this, this)
         setContent {
             val gameState by gameRepository.state
@@ -60,6 +67,24 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 voices = availableVoices,
                 selectedVoiceName = selectedVoiceName,
                 voiceReady = ttsReady,
+                voiceEnabled = voiceEnabled,
+                speechRate = speechRate,
+                speechPitch = speechPitch,
+                onVoiceEnabledChanged = { enabled ->
+                    voiceEnabled = enabled
+                    prefs.edit().putBoolean("voice_enabled", enabled).apply()
+                    if (!enabled) tts?.stop()
+                },
+                onSpeechRateChanged = { rate ->
+                    speechRate = rate.coerceIn(0.75f, 1.25f)
+                    prefs.edit().putFloat("speech_rate", speechRate).apply()
+                    tts?.setSpeechRate(speechRate)
+                },
+                onSpeechPitchChanged = { pitch ->
+                    speechPitch = pitch.coerceIn(0.8f, 1.2f)
+                    prefs.edit().putFloat("speech_pitch", speechPitch).apply()
+                    tts?.setPitch(speechPitch)
+                },
                 onVoiceSelected = { voice ->
                     selectedVoiceName = voice.name
                     prefs.edit().putString("voice_name", voice.name).apply()
@@ -115,10 +140,18 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
             ttsReady = true
-            tts?.language = Locale.getDefault()
+            tts?.setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build()
+            )
+            tts?.language = Locale("ru", "RU")
+            tts?.setSpeechRate(speechRate)
+            tts?.setPitch(speechPitch)
             val all = tts?.voices?.toList().orEmpty()
             availableVoices = all.filter { it.locale.language == "ru" }
-                .sortedWith(compareBy<Voice> { it.isNetworkConnectionRequired }.thenBy { it.name })
+                .sortedWith(compareBy<Voice> { it.isNetworkConnectionRequired }.thenByDescending { it.quality }.thenBy { it.name })
             if (availableVoices.isEmpty()) availableVoices = all.sortedBy { it.name }
             val chosen = availableVoices.firstOrNull { it.name == selectedVoiceName } ?: availableVoices.firstOrNull()
             if (chosen != null) {
@@ -132,7 +165,9 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private fun speakSample() = speak("Приготовиться! Через триста метров правый четыре. Не режь, там сюрприз.")
 
     private fun speak(phrase: String) {
-        if (ttsReady) tts?.speak(phrase, TextToSpeech.QUEUE_FLUSH, null, "rally_callout")
+        if (!voiceEnabled || !ttsReady || phrase.isBlank()) return
+        val params = Bundle().apply { putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f) }
+        tts?.speak(phrase, TextToSpeech.QUEUE_FLUSH, params, "rally_" + System.currentTimeMillis())
     }
 
     override fun onDestroy() {
@@ -147,6 +182,12 @@ fun RallyCopilotApp(
     voices: List<Voice>,
     selectedVoiceName: String,
     voiceReady: Boolean,
+    voiceEnabled: Boolean,
+    speechRate: Float,
+    speechPitch: Float,
+    onVoiceEnabledChanged: (Boolean) -> Unit,
+    onSpeechRateChanged: (Float) -> Unit,
+    onSpeechPitchChanged: (Float) -> Unit,
     onVoiceSelected: (Voice) -> Unit,
     onTestVoice: () -> Unit,
     currentLocation: Location?,
@@ -188,8 +229,9 @@ fun RallyCopilotApp(
                 2 -> RallyShopScreen(gameState, gameRepository, Modifier.padding(padding))
                 3 -> RallyAchievementsScreen(gameState, Modifier.padding(padding))
                 else -> ProfileScreen(
-                    voices, selectedVoiceName, voiceReady, onVoiceSelected, onTestVoice,
-                    gameState, Modifier.padding(padding)
+                    voices, selectedVoiceName, voiceReady, voiceEnabled, speechRate, speechPitch,
+                    onVoiceEnabledChanged, onSpeechRateChanged, onSpeechPitchChanged,
+                    onVoiceSelected, onTestVoice, gameState, Modifier.padding(padding)
                 )
             }
         }
@@ -201,6 +243,12 @@ private fun ProfileScreen(
     voices: List<Voice>,
     selectedVoiceName: String,
     voiceReady: Boolean,
+    voiceEnabled: Boolean,
+    speechRate: Float,
+    speechPitch: Float,
+    onVoiceEnabledChanged: (Boolean) -> Unit,
+    onSpeechRateChanged: (Float) -> Unit,
+    onSpeechPitchChanged: (Float) -> Unit,
     onVoiceSelected: (Voice) -> Unit,
     onTestVoice: () -> Unit,
     gameState: RallyGameState,
@@ -252,6 +300,19 @@ private fun ProfileScreen(
                     onClick = onTestVoice, enabled = voiceReady && selected != null, modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = lime, contentColor = Color(0xFF101418))
                 ) { Text("ПРОСЛУШАТЬ ШТУРМАНА", fontWeight = FontWeight.Bold) }
+                Spacer(Modifier.height(14.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.weight(1f)) {
+                        Text("ГОЛОСОВЫЕ ПОДСКАЗКИ", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text("Команды по маршруту и предупреждения о манёврах", color = muted, fontSize = 11.sp)
+                    }
+                    Switch(checked = voiceEnabled, onCheckedChange = onVoiceEnabledChanged)
+                }
+                Spacer(Modifier.height(10.dp))
+                Text("СКОРОСТЬ РЕЧИ · " + "%.2f×".format(speechRate), color = muted, fontSize = 11.sp)
+                Slider(value = speechRate, onValueChange = onSpeechRateChanged, valueRange = 0.75f..1.25f)
+                Text("ВЫСОТА ГОЛОСА · " + "%.2f×".format(speechPitch), color = muted, fontSize = 11.sp)
+                Slider(value = speechPitch, onValueChange = onSpeechPitchChanged, valueRange = 0.8f..1.2f)
             }
         }
         Spacer(Modifier.height(14.dp))
@@ -271,7 +332,7 @@ private fun ProfileScreen(
             Column(Modifier.padding(16.dp)) {
                 Text("ВЕРСИЯ ПРИЛОЖЕНИЯ", color = muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(6.dp))
-                Text("Rally Copilot 0.8.0", color = Color.White, fontWeight = FontWeight.Bold)
+                Text("Rally Copilot 0.9.0", color = Color.White, fontWeight = FontWeight.Bold)
                 Text("Игровой профиль · MapLibre · OpenStreetMap", color = muted, fontSize = 11.sp)
             }
         }
