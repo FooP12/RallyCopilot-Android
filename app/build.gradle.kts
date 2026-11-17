@@ -16,6 +16,21 @@ android {
         versionName = "0.9.0"
     }
 
+    signingConfigs {
+        create("stableDebug") {
+            storeFile = file(System.getenv("RALLY_DEBUG_KEYSTORE") ?: "${System.getProperty("user.home")}/.android/rallycopilot-debug.keystore")
+            storePassword = "rally-copilot-debug-only"
+            keyAlias = "rallycopilotdebug"
+            keyPassword = "rally-copilot-debug-only"
+        }
+    }
+
+    buildTypes {
+        getByName("debug") {
+            signingConfig = signingConfigs.getByName("stableDebug")
+        }
+    }
+
     buildFeatures { compose = true }
 
     compileOptions {

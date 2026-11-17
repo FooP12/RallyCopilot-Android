@@ -38,8 +38,24 @@ jobs:
       - name: Cache stable debug signing key
         uses: actions/cache@v4
         with:
-          path: ~/.android/debug.keystore
+          path: ~/.android/rallycopilot-debug.keystore
           key: rallycopilot-debug-keystore-v1
+      - name: Prepare debug signing key
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.android"
+          if [ ! -f "$HOME/.android/rallycopilot-debug.keystore" ]; then
+            keytool -genkeypair -noprompt -v \
+              -keystore "$HOME/.android/rallycopilot-debug.keystore" \
+              -storetype JKS \
+              -storepass "rally-copilot-debug-only" \
+              -alias rallycopilotdebug \
+              -keypass "rally-copilot-debug-only" \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Rally Copilot Debug, OU=Test, O=Rally Copilot, L=Development, ST=Development, C=NL"
+          fi
+          echo "RALLY_DEBUG_KEYSTORE=$HOME/.android/rallycopilot-debug.keystore" >> "$GITHUB_ENV"
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
       - name: Upload APK
