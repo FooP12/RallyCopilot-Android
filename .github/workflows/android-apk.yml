@@ -35,6 +35,11 @@ jobs:
           echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" --licenses >/dev/null || true
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" --install "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+      - name: Cache stable debug signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: rallycopilot-debug-keystore-v1
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
       - name: Upload APK
