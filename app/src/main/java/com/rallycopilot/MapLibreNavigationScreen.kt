@@ -96,6 +96,43 @@ fun MapLibreNavigationScreen(
     var centeredOnGps by remember { mutableStateOf(false) }
     var lastRouteRequestAt by remember { mutableLongStateOf(0L) }
     val mapView = remember { MapView(context).apply { onCreate(null) } }
+    var previousTripActive by remember { mutableStateOf(gameState.tripActive) }
+    var previousWholeKilometer by remember { mutableIntStateOf(gameState.totalKilometers.toInt()) }
+    var previousAchievements by remember { mutableStateOf(gameState.unlockedAchievements) }
+
+    LaunchedEffect(gameState.tripActive) {
+        if (gameState.tripActive != previousTripActive) {
+            if (gameState.tripActive) {
+                onSpeak("Заезд начат. Штурман на связи. Смотри на дорогу.")
+            } else {
+                onSpeak("Заезд завершён. Пройдено " + "%.2f".format(gameState.tripKilometers) + " километра.")
+            }
+            previousTripActive = gameState.tripActive
+        }
+    }
+
+    LaunchedEffect(gameState.totalKilometers, gameState.unlockedAchievements) {
+        val wholeKilometers = gameState.totalKilometers.toInt()
+        val messages = mutableListOf<String>()
+        if (wholeKilometers > previousWholeKilometer) {
+            messages += "Километр пройден. Пять RC начислено."
+        }
+        val newAchievements = gameState.unlockedAchievements - previousAchievements
+        val achievementNames = mapOf(
+            "first_trip" to "Первая поездка",
+            "first_km" to "Первый километр",
+            "ten_km" to "Десять километров",
+            "fifty_km" to "Пятьдесят километров",
+            "hundred_km" to "Сто километров",
+            "five_trips" to "Пять завершённых поездок"
+        )
+        newAchievements.forEach { id ->
+            achievementNames[id]?.let { messages += "Новое достижение: " + it }
+        }
+        if (messages.isNotEmpty()) onSpeak(messages.joinToString(". "))
+        previousWholeKilometer = wholeKilometers
+        previousAchievements = gameState.unlockedAchievements
+    }
 
     DisposableEffect(lifecycleOwner, mapView) {
         val observer = LifecycleEventObserver { _, event ->

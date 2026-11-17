@@ -47,13 +47,7 @@ class RallyGuidanceEngine {
             }
             if (level < lastAnnouncedLevel) {
                 lastAnnouncedLevel = level
-                val distanceText = when (level) {
-                    4 -> "километр"
-                    3 -> "пятьсот метров"
-                    2 -> "двести метров"
-                    else -> "восемьдесят метров"
-                }
-                return "Через " + distanceText + ": " + step.instruction
+                return "Через " + spokenDistance(remaining) + ": " + step.instruction
             }
             return null
         }
@@ -67,6 +61,10 @@ class RallyGuidanceEngine {
         if (remaining <= 35.0) return "Сейчас: " + step.instruction
         return "Через " + distanceLabel(remaining) + " · " + step.instruction
     }
+
+    private fun spokenDistance(meters: Double): String =
+        if (meters >= 1000.0) "%.1f километра".format(meters / 1000.0)
+        else (kotlin.math.round(meters / 50.0) * 50.0).toInt().toString() + " метров"
 
     private fun distanceLabel(meters: Double): String =
         if (meters >= 1000.0) "%.1f километра".format(meters / 1000.0) else meters.toInt().toString() + " метров"

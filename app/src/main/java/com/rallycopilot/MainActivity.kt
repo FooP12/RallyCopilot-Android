@@ -297,7 +297,7 @@ private fun ProfileScreen(
                 )
                 Spacer(Modifier.height(12.dp))
                 Button(
-                    onClick = onTestVoice, enabled = voiceReady && selected != null, modifier = Modifier.fillMaxWidth(),
+                    onClick = onTestVoice, enabled = voiceReady && selected != null && voiceEnabled, modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = lime, contentColor = Color(0xFF101418))
                 ) { Text("ПРОСЛУШАТЬ ШТУРМАНА", fontWeight = FontWeight.Bold) }
                 Spacer(Modifier.height(14.dp))
@@ -318,13 +318,13 @@ private fun ProfileScreen(
         Spacer(Modifier.height(14.dp))
         Surface(color = panel, shape = androidx.compose.foundation.shape.RoundedCornerShape(18.dp)) {
             Column(Modifier.padding(16.dp)) {
-                Text("МАНЕРА РЕЧИ", color = muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text("СТИЛЬ ШТУРМАНА", color = muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(8.dp))
-                Text("Раллийный сленг с юмором и характером", color = Color.White, fontWeight = FontWeight.Bold)
+                Text("Короткие команды по делу", color = Color.White, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(8.dp))
-                Text("«Приготовиться! Через триста метров правый четыре. Не режь, там сюрприз.»", color = lime, fontSize = 16.sp)
+                Text("«Через 500 метров поверни направо. Дальше держись главной дороги.»", color = lime, fontSize = 16.sp)
                 Spacer(Modifier.height(8.dp))
-                Text("Команды остаются короткими и понятными. Шутки не мешают важным подсказкам.", color = muted, fontSize = 12.sp)
+                Text("Штурман заранее предупреждает о поворотах, развязках и финише. При уходе с маршрута предупредит о перестроении.", color = muted, fontSize = 12.sp)
             }
         }
         Spacer(Modifier.height(14.dp))
