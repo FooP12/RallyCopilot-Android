@@ -185,7 +185,7 @@ fun MapLibreNavigationScreen(
     Box(modifier.fillMaxSize().background(Color(0xFF101418))) {
         AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
         Column(Modifier.align(Alignment.TopStart).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            PlaceSearchPanel(onPlaceSelected = { selected ->
+            PlaceSearchPanel(currentLocation = currentLocation, onPlaceSelected = { selected ->
                 destination = selected
                 routeDistance = ""
                 routeEta = ""
