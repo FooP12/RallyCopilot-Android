@@ -271,7 +271,7 @@ private fun ProfileScreen(
             Column(Modifier.padding(16.dp)) {
                 Text("ВЕРСИЯ ПРИЛОЖЕНИЯ", color = muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(6.dp))
-                Text("Rally Copilot 0.7.0", color = Color.White, fontWeight = FontWeight.Bold)
+                Text("Rally Copilot 0.8.0", color = Color.White, fontWeight = FontWeight.Bold)
                 Text("Игровой профиль · MapLibre · OpenStreetMap", color = muted, fontSize = 11.sp)
             }
         }
