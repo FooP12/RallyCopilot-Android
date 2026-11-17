@@ -185,6 +185,42 @@ fun MapLibreNavigationScreen(
     Box(modifier.fillMaxSize().background(Color(0xFF101418))) {
         AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
         Column(Modifier.align(Alignment.TopStart).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            PlaceSearchPanel(onPlaceSelected = { selected ->
+                destination = selected
+                routeDistance = ""
+                routeEta = ""
+                nextInstruction = ""
+                map?.style?.getSourceAs<GeoJsonSource>("rally-destination-source")?.setGeoJson(
+                    Feature.fromGeometry(Point.fromLngLat(selected.longitude, selected.latitude))
+                )
+                map?.animateCamera(CameraUpdateFactory.newLatLngZoom(selected, 14.5), 650)
+                val origin = currentLocation
+                if (origin == null) {
+                    routeStatus = "Адрес выбран. Включи GPS, чтобы построить маршрут"
+                } else if (!routeBusy) {
+                    routeBusy = true
+                    routeStatus = "Считаю маршрут до выбранного места…"
+                    scope.launch {
+                        try {
+                            val result = fetchOsrmRoute(origin.latitude, origin.longitude, selected.latitude, selected.longitude)
+                            routeDistance = formatDistance(result.distanceMeters)
+                            routeEta = formatDuration(result.durationSeconds)
+                            nextInstruction = result.firstInstruction
+                            val line = LineString.fromLngLats(result.coordinates.map { Point.fromLngLat(it.longitude, it.latitude) })
+                            map?.style?.getSourceAs<GeoJsonSource>("rally-route-source")?.setGeoJson(Feature.fromGeometry(line))
+                            routeStatus = "Маршрут построен. Это предварительный расчёт, не автопилот."
+                            if (result.firstInstruction.isNotBlank()) onSpeak("Маршрут построен. ${result.firstInstruction}")
+                            val bounds = org.maplibre.android.geometry.LatLngBounds.Builder()
+                                .include(LatLng(origin.latitude, origin.longitude)).include(selected).build()
+                            map?.easeCamera(CameraUpdateFactory.newLatLngBounds(bounds, 80), 700)
+                        } catch (e: Exception) {
+                            routeStatus = "Не удалось построить маршрут: ${e.message ?: "проверь интернет"}"
+                        } finally {
+                            routeBusy = false
+                        }
+                    }
+                }
+            })
             Surface(color = RallyPanel, shape = RoundedCornerShape(12.dp)) {
                 Text("RALLY COPILOT · MAPLIBRE", color = RallyLime, modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp), fontSize = 11.sp)
             }
