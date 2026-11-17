@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import com.rallycopilot.game.RallyGameRepository
 import com.rallycopilot.game.RallyGameState
 
@@ -155,5 +156,69 @@ private fun StatValue(label: String, value: String) {
     Column {
         Text(label, color = GameMuted, fontSize = 10.sp)
         Text(value, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+    }
+}
+
+@Composable
+fun RallyGarageScreen(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val preferences = remember { context.getSharedPreferences("rally_garage", android.content.Context.MODE_PRIVATE) }
+    var vehicleName by remember { mutableStateOf(preferences.getString("vehicle_name", "") ?: "") }
+    var vehicleYear by remember { mutableStateOf(preferences.getString("vehicle_year", "") ?: "") }
+    var vehicleEngine by remember { mutableStateOf(preferences.getString("vehicle_engine", "") ?: "") }
+    var saved by remember { mutableStateOf(vehicleName.isNotBlank()) }
+
+    Column(modifier.fillMaxSize().padding(18.dp)) {
+        Spacer(Modifier.height(20.dp))
+        Text("ТВОЙ АВТОМОБИЛЬ", color = GameLime, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Text("Гараж", color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(14.dp))
+        Surface(color = GamePanel, shape = RoundedCornerShape(16.dp)) {
+            Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                Text(if (saved) "АКТИВНЫЙ АВТОМОБИЛЬ" else "ДОБАВИТЬ АВТОМОБИЛЬ", color = GameMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = vehicleName, onValueChange = { vehicleName = it; saved = false },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("Марка и модель") },
+                    placeholder = { Text("Например, Nissan Pathfinder") }
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = vehicleYear, onValueChange = { vehicleYear = it.filter(Char::isDigit).take(4); saved = false },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("Год выпуска") },
+                    placeholder = { Text("Например, 2011") }
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = vehicleEngine, onValueChange = { vehicleEngine = it; saved = false },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("Двигатель / модификация") },
+                    placeholder = { Text("Например, 2.5 дизель") }
+                )
+                Spacer(Modifier.height(12.dp))
+                Button(
+                    onClick = {
+                        preferences.edit().putString("vehicle_name", vehicleName.trim())
+                            .putString("vehicle_year", vehicleYear.trim())
+                            .putString("vehicle_engine", vehicleEngine.trim()).apply()
+                        saved = vehicleName.isNotBlank()
+                    },
+                    enabled = vehicleName.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = GameLime, contentColor = Color(0xFF101418))
+                ) { Text("СОХРАНИТЬ АВТОМОБИЛЬ", fontWeight = FontWeight.Bold) }
+                if (saved) {
+                    Spacer(Modifier.height(8.dp))
+                    Text("Автомобиль сохранён на этом устройстве.", color = GameLime, fontSize = 11.sp)
+                }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        Surface(color = GamePanel, shape = RoundedCornerShape(14.dp)) {
+            Column(Modifier.padding(14.dp)) {
+                Text("СЛЕДУЮЩИЕ ВОЗМОЖНОСТИ ГАРАЖА", color = GameLime, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(6.dp))
+                Text("История обслуживания, расходы на топливо, напоминания о ТО и статистика поездок будут привязаны к выбранному автомобилю.", color = GameMuted, fontSize = 11.sp)
+            }
+        }
     }
 }
