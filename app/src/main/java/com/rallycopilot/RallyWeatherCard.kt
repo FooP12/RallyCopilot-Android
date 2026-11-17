@@ -2,6 +2,7 @@ package com.rallycopilot
 
 import android.location.Location
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
@@ -36,6 +37,7 @@ fun RallyWeatherCard(location: Location?, modifier: Modifier = Modifier) {
     var weather by remember { mutableStateOf<RallyWeather?>(null) }
     var loading by remember { mutableStateOf(false) }
     var failed by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(false) }
     val latitudeKey = location?.latitude?.times(100)?.roundToInt()
     val longitudeKey = location?.longitude?.times(100)?.roundToInt()
 
@@ -55,7 +57,7 @@ fun RallyWeatherCard(location: Location?, modifier: Modifier = Modifier) {
         }
     }
 
-    Surface(modifier.fillMaxWidth(), color = Color(0xE51B2329), shape = RoundedCornerShape(12.dp)) {
+    Surface(modifier.fillMaxWidth().clickable { expanded = !expanded }, color = Color(0xE51B2329), shape = RoundedCornerShape(12.dp)) {
         Column(Modifier.padding(horizontal = 11.dp, vertical = 8.dp)) {
             Text("ПОГОДА РЯДОМ", color = Color(0xFFB7F34A), fontSize = 9.sp)
             when {
@@ -73,9 +75,13 @@ fun RallyWeatherCard(location: Location?, modifier: Modifier = Modifier) {
                         Spacer(Modifier.height(3.dp))
                         Text(value.warning, color = Color(0xFFFFA36C), fontSize = 10.sp)
                     }
-                    Spacer(Modifier.height(4.dp))
-                    Text("ПРОГНОЗ НА 3 ДНЯ", color = Color(0xFFB7F34A), fontSize = 9.sp)
-                    value.forecast.forEach { Text(it, color = Color.White, fontSize = 10.sp) }
+                    if (expanded) {
+                        Spacer(Modifier.height(4.dp))
+                        Text("ПРОГНОЗ НА 3 ДНЯ", color = Color(0xFFB7F34A), fontSize = 9.sp)
+                        value.forecast.forEach { Text(it, color = Color.White, fontSize = 10.sp) }
+                    } else {
+                        Text("Нажми, чтобы открыть прогноз на 3 дня", color = Color.LightGray, fontSize = 9.sp)
+                    }
                 }
                 failed -> Text("Погода временно недоступна. Проверь интернет.", color = Color(0xFFFFA08A), fontSize = 10.sp)
                 else -> Text("Нет данных о погоде", color = Color.White, fontSize = 11.sp)
