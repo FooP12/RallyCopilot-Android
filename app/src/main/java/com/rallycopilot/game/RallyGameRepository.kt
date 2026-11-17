@@ -49,7 +49,6 @@ class RallyGameRepository(private val preferences: SharedPreferences) {
 
         val current = state.value
         val addedKm = meters / 1000.0
-        val oldTripKm = current.tripKilometers
         val newTripKm = oldTripKm + addedKm
         val newTotalKm = current.totalKilometers + addedKm
         val earnedKilometerCoins = (floor(newTotalKm) - floor(current.totalKilometers)).toInt() * 5
