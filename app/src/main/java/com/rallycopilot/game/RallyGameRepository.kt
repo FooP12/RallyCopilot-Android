@@ -12,7 +12,8 @@ data class RallyGameState(
     val completedTrips: Int = 0,
     val tripActive: Boolean = false,
     val unlockedAchievements: Set<String> = emptySet(),
-    val purchasedItems: Set<String> = emptySet()
+    val purchasedItems: Set<String> = emptySet(),
+    val equippedItems: Set<String> = emptySet()
 )
 
 class RallyGameRepository(private val preferences: SharedPreferences) {
@@ -67,8 +68,14 @@ class RallyGameRepository(private val preferences: SharedPreferences) {
     fun purchase(itemId: String, price: Int): Boolean {
         val current = state.value
         if (itemId in current.purchasedItems || current.coins < price) return false
-        update(current.copy(coins = current.coins - price, purchasedItems = current.purchasedItems + itemId))
+        update(current.copy(coins = current.coins - price, purchasedItems = current.purchasedItems + itemId, equippedItems = current.equippedItems + itemId))
         return true
+    }
+
+    fun equip(itemId: String) {
+        val current = state.value
+        if (itemId !in current.purchasedItems) return
+        update(current.copy(equippedItems = current.equippedItems + itemId))
     }
 
     private fun unlock(current: RallyGameState, id: String, condition: Boolean, reward: Int): RallyGameState {
@@ -87,6 +94,7 @@ class RallyGameRepository(private val preferences: SharedPreferences) {
             .putInt("completed_trips", value.completedTrips)
             .putStringSet("unlocked_achievements", value.unlockedAchievements)
             .putStringSet("purchased_items", value.purchasedItems)
+            .putStringSet("equipped_items", value.equippedItems)
             .apply()
     }
 
@@ -95,6 +103,7 @@ class RallyGameRepository(private val preferences: SharedPreferences) {
         totalKilometers = preferences.getLong("total_km_milli", 0L) / 1000.0,
         completedTrips = preferences.getInt("completed_trips", 0),
         unlockedAchievements = preferences.getStringSet("unlocked_achievements", emptySet())?.toSet() ?: emptySet(),
-        purchasedItems = preferences.getStringSet("purchased_items", emptySet())?.toSet() ?: emptySet()
+        purchasedItems = preferences.getStringSet("purchased_items", emptySet())?.toSet() ?: emptySet(),
+        equippedItems = preferences.getStringSet("equipped_items", emptySet())?.toSet() ?: emptySet()
     )
 }
