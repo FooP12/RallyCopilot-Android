@@ -41,18 +41,33 @@ jobs:
         with:
           gradle-version: "8.9"
 
+      - name: Check OpenAI API key
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "::error::GitHub Actions secret OPENAI_API_KEY is missing or empty. Add it in Settings > Secrets and variables > Actions, then rerun this workflow."
+            exit 1
+          fi
+          echo "OpenAI API key is present (value is not displayed)."
+
       - name: Prepare task
         env:
           RALLY_TASK: ${{ inputs.task }}
-          EVENT_NAME: ${{ github.event_name }}
         run: |
-          if [ -n "$RALLY_TASK" ]; then
-            printf '%s\n' "$RALLY_TASK" > .github/codex/runtime-task.md
-          else
-            cat > .github/codex/runtime-task.md <<'EOF'
+          set -euo pipefail
+          test -f .github/codex/agent-task.md
+          cat .github/codex/agent-task.md > .github/codex/runtime-task.md
+          {
+            printf '\n\n## Current task\n'
+            if [ -n "$RALLY_TASK" ]; then
+              printf '%s\n' "$RALLY_TASK"
+            else
+              cat <<'EOF'
           Выполни плановый технический аудит RallyCopilot. Изучи структуру проекта, README, TODO и текущую реализацию. Проверь сборку и тесты. Исправляй только конкретные, подтверждённые дефекты и безопасные технические проблемы, не меняй продуктовые решения и дизайн без отдельной задачи. Если проектная структура неполная, сначала проверь архив RallyCopilot_Android_v0.5_compile_ready.zip и восстанови корректную структуру проекта, не теряя имеющиеся исходники. Не добавляй секреты, ключи API и реальные пользовательские данные. В конце запусти доступные проверки и подготовь краткий отчёт.
           EOF
-          fi
+            fi
+          } >> .github/codex/runtime-task.md
 
       - name: Run Codex developer
         id: codex
