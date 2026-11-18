@@ -30,6 +30,17 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
       - name: Prepare task
         env:
           RALLY_TASK: ${{ inputs.task }}
@@ -53,7 +64,6 @@ jobs:
           permission-profile: ":workspace"
           safety-strategy: drop-sudo
           allow-users: "FooP12"
-          model: "gpt-5.4"
           effort: "high"
 
       - name: Validate Android build
