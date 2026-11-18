@@ -1,0 +1,133 @@
+name: Rally Developer
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "Задача для Rally Developer. Оставь пустым для технического аудита."
+        required: false
+        type: string
+  schedule:
+    - cron: "17 3 * * 1"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: rally-developer-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  develop:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Prepare task
+        env:
+          RALLY_TASK: ${{ inputs.task }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ -n "$RALLY_TASK" ]; then
+            printf '%s\n' "$RALLY_TASK" > .github/codex/runtime-task.md
+          else
+            cat > .github/codex/runtime-task.md <<'EOF'
+          Выполни плановый технический аудит RallyCopilot. Изучи структуру проекта, README, TODO и текущую реализацию. Проверь сборку и тесты. Исправляй только конкретные, подтверждённые дефекты и безопасные технические проблемы, не меняй продуктовые решения и дизайн без отдельной задачи. Если проектная структура неполная, сначала проверь архив RallyCopilot_Android_v0.5_compile_ready.zip и восстанови корректную структуру проекта, не теряя имеющиеся исходники. Не добавляй секреты, ключи API и реальные пользовательские данные. В конце запусти доступные проверки и подготовь краткий отчёт.
+          EOF
+          fi
+
+      - name: Run Codex developer
+        id: codex
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt-file: .github/codex/runtime-task.md
+          output-file: /tmp/rally-developer-report.md
+          permission-profile: ":workspace"
+          safety-strategy: drop-sudo
+          allow-users: "FooP12"
+          effort: "high"
+
+      - name: Validate Android build
+        id: build
+        run: |
+          set -euo pipefail
+          if [ -f ./gradlew ]; then
+            chmod +x ./gradlew
+            ./gradlew testDebugUnitTest assembleDebug --stacktrace
+          elif [ -f app/build.gradle.kts ] || [ -f app/build.gradle ]; then
+            gradle testDebugUnitTest assembleDebug --stacktrace
+          else
+            echo "Android Gradle module was not found after the agent run." >&2
+            exit 1
+          fi
+
+      - name: Prepare pull request
+        id: changes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          rm -f .github/codex/runtime-task.md
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          BRANCH="agent/rally-${RUN_ID}"
+          git config user.name "rally-developer[bot]"
+          git config user.email "rally-developer[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Rally Developer: automated improvements"
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${BRANCH}"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "branch=${BRANCH}" >> "$GITHUB_OUTPUT"
+
+      - name: Open pull request
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ steps.changes.outputs.branch }}
+          TASK: ${{ inputs.task }}
+          REPORT: ${{ steps.codex.outputs.final-message }}
+        run: |
+          {
+            echo "## Rally Developer report"
+            echo
+            echo "${REPORT}"
+            echo
+            echo "## Request"
+            echo "${TASK:-Scheduled technical audit}"
+            echo
+            echo "Build and unit-test workflow completed successfully before this PR was opened."
+          } > /tmp/pr-body.md
+          gh pr create --base main --head "$BRANCH" \
+            --title "Rally Developer: automated improvements" \
+            --body-file /tmp/pr-body.md
+
+      - name: Upload debug APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: RallyCopilot-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: warn
+          retention-days: 14
